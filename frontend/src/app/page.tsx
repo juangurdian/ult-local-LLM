@@ -7,6 +7,6 @@ export default function Home() {
       <AppShell>
         <ChatInterface />
       </AppShell>
-    </main>
+      </main>
   );
 }
