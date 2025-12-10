@@ -11,10 +11,10 @@ type MarkdownRendererProps = {
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      className="markdown-content"
-      components={{
+    <div className="markdown-content">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
         // Headers
         h1: ({ node, ...props }) => (
           <h1 className="mb-3 mt-4 text-xl font-bold text-slate-100 first:mt-0" {...props} />
@@ -133,6 +133,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     >
       {content}
     </ReactMarkdown>
+    </div>
   );
 }
 
