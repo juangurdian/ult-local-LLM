@@ -12,6 +12,7 @@ export default function Sidebar() {
   const activeId = useChatStore((state) => state.activeId);
   const setActiveConversation = useChatStore((state) => state.setActiveConversation);
   const createConversation = useChatStore((state) => state.createConversation);
+  const deleteConversation = useChatStore((state) => state.deleteConversation);
 
   const list = useMemo(
     () => Object.values(conversations).sort((a, b) => b.updatedAt - a.updatedAt),
@@ -60,27 +61,45 @@ export default function Sidebar() {
                 </div>
               )}
               {list.map((item) => (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => setActiveConversation(item.id)}
-                  className={`group w-full rounded-lg px-3 py-2.5 text-left transition ${
+                  className={`group relative w-full rounded-lg transition ${
                     activeId === item.id
                       ? "bg-cyan-500/15 ring-1 ring-cyan-500/40"
                       : "hover:bg-slate-900/60"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="truncate text-sm font-medium text-slate-100">
-                      {item.title || "Untitled chat"}
-                    </span>
-                    <span className="ml-2 shrink-0 text-[10px] text-slate-500">
-                      {item.messages.length}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
-                    {item.messages[item.messages.length - 1]?.content || "No messages"}
-                  </p>
-                </button>
+                  <button
+                    onClick={() => setActiveConversation(item.id)}
+                    className="w-full px-3 py-2.5 text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="truncate text-sm font-medium text-slate-100">
+                        {item.title || "Untitled chat"}
+                      </span>
+                      <span className="ml-2 shrink-0 text-[10px] text-slate-500">
+                        {item.messages.length}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {item.messages[item.messages.length - 1]?.content || "No messages"}
+                    </p>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete "${item.title || "Untitled chat"}"?`)) {
+                        deleteConversation(item.id);
+                      }
+                    }}
+                    className="absolute right-2 top-2 hidden rounded p-1 text-slate-500 transition hover:bg-red-500/20 hover:text-red-400 group-hover:block"
+                    title="Delete conversation"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               ))}
             </div>
           </nav>

@@ -42,26 +42,23 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!activeId) {
-      const id = createConversation("New chat");
-      setActiveConversation(id);
-      return;
-    }
+    // Only seed initial messages if there's an active conversation
+    if (!activeId) return;
 
     if (seededRef.current) return;
     if (initialMessages && initialMessages.length) {
       initialMessages.forEach((msg) => addMessage(msg, activeId));
     }
     seededRef.current = true;
-  }, [activeId, addMessage, createConversation, initialMessages, setActiveConversation]);
+  }, [activeId, addMessage, initialMessages]);
 
   const currentMessages = activeId ? conversations[activeId]?.messages ?? [] : [];
 
-  const appendAssistantChunk = (chunk: string) => {
-    if (!activeId) return;
+  const appendAssistantChunk = (chunk: string, convId: string) => {
+    if (!convId) return;
     // Use functional update to avoid stale snapshots
     useChatStore.setState((state) => {
-      const conversation = state.conversations[activeId];
+      const conversation = state.conversations[convId];
       if (!conversation) return state;
 
       const updated = [...conversation.messages];
@@ -84,7 +81,7 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
       return {
         conversations: {
           ...state.conversations,
-          [activeId]: {
+          [convId]: {
             ...conversation,
             messages: updated,
             updatedAt: Date.now(),
@@ -101,7 +98,14 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
     content: string, 
     options?: { toolMode?: ToolMode; attachments?: Attachment[] }
   ) => {
-    if (!content.trim() || !activeId || offline) return;
+    if (!content.trim() || offline) return;
+    
+    // Create a new conversation if none is active
+    let conversationId = activeId;
+    if (!conversationId) {
+      conversationId = createConversation("New chat");
+      setActiveConversation(conversationId);
+    }
     
     const { toolMode, attachments } = options || {};
     
@@ -119,7 +123,7 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
       }
     }
     
-    addMessage({ role: "user", content: displayContent }, activeId);
+    addMessage({ role: "user", content: displayContent }, conversationId);
     setIsGenerating(true);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -144,9 +148,12 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
       }
     }
 
+    // Get messages for this conversation
+    const convMessages = conversationId ? conversations[conversationId]?.messages ?? [] : [];
+    
     // Build the payload locally to avoid race conditions with store updates
     const previous = [
-      ...currentMessages.map((msg) => ({ role: msg.role, content: msg.content })),
+      ...convMessages.map((msg) => ({ role: msg.role, content: msg.content })),
       { role: "user", content: fullContent },
     ];
 
@@ -164,11 +171,11 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
           images: images && images.length > 0 ? images : undefined,
         },
         {
-          onDelta: (chunk) => appendAssistantChunk(chunk),
+          onDelta: (chunk) => appendAssistantChunk(chunk, conversationId),
           onRouting: (payload) => {
             console.debug("routing payload", payload);
-            if (activeId) {
-              setRoutingInfo(activeId, payload);
+            if (conversationId) {
+              setRoutingInfo(conversationId, payload);
             }
           },
           onDone: () => {
@@ -176,14 +183,14 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
           },
           onError: (message) => {
             console.error("stream error", message);
-            appendAssistantChunk(`\n⚠️ ${message}`);
+            appendAssistantChunk(`\n⚠️ ${message}`, conversationId);
             setIsGenerating(false);
           },
         }
       );
     } catch (error) {
       console.error("streamChat failed", error);
-      appendAssistantChunk("\n⚠️ Unable to stream response.");
+      appendAssistantChunk("\n⚠️ Unable to stream response.", conversationId);
       setIsGenerating(false);
     }
   };
