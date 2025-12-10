@@ -7,8 +7,10 @@ import type { Message } from "./types";
 import { useChatStore } from "@/lib/stores/chat";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { streamChat } from "@/lib/api/chat";
+import { generateImage } from "@/lib/api/images";
 import RoutingInfoPanel from "./RoutingInfoPanel";
 import { useOffline } from "@/lib/hooks/useOffline";
+import { useAppStore } from "@/lib/stores/app";
 
 type ChatInterfaceProps = {
   initialMessages?: Message[];
@@ -34,6 +36,7 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
   );
   const selectedModel = useChatStore((state) => state.selectedModel);
   const smartRoutingEnabled = useChatStore((state) => state.smartRoutingEnabled);
+  const mode = useAppStore((state) => state.mode);
 
   // Determine effective model: "auto" if smart routing is on, otherwise the selected model
   const effectiveModel = smartRoutingEnabled ? "auto" : selectedModel;
@@ -127,6 +130,39 @@ export default function ChatInterface({ initialMessages }: ChatInterfaceProps) {
     setIsGenerating(true);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+
+    // Handle image generation mode
+    if (mode === "image") {
+      try {
+        const result = await generateImage({
+          prompt: content,
+          width: 1024,
+          height: 1024,
+          steps: 20,
+          cfg: 7.0,
+        });
+
+        if (result.success && result.image_base64) {
+          // Add image message
+          const imageMessage: Message = {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `![Generated Image](data:image/png;base64,${result.image_base64})\n\n**Prompt:** ${content}\n**Seed:** ${result.seed ?? "random"}`,
+            createdAt: Date.now(),
+          };
+          addMessage(imageMessage, conversationId);
+        } else {
+          appendAssistantChunk(`\n⚠️ ${result.message || "Image generation failed"}`, conversationId);
+        }
+        setIsGenerating(false);
+        return;
+      } catch (error) {
+        console.error("Image generation failed", error);
+        appendAssistantChunk(`\n⚠️ Image generation failed: ${error instanceof Error ? error.message : "Unknown error"}`, conversationId);
+        setIsGenerating(false);
+        return;
+      }
+    }
 
     // Determine model based on tool mode
     let modelToUse = effectiveModel;
